@@ -193,11 +193,12 @@ function getVolumes(volumes_url, titles) {
                                     if (program.verbose > 0)
                                         console.log("Saving " + absolute_url + " to " + output_pathname + " of " + _title.join(", "))
 
-                                    setTimeout(function() {
                                         return baseRequest.get(absolute_url).on('error', function(err) {
                                             console.error(err)
-                                        }).pipe(fs.createWriteStream(output_pathname))
-                                    }, program.wait)
+                                        }).pipe(fs.createWriteStream(output_pathname).on('error',function(err){
+                                            fs.unlink(output_pathname)
+                                        }))
+                                    })
 
                                 } else {
                                     downloaded_pdf.push(absolute_url)
