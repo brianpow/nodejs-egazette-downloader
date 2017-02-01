@@ -127,9 +127,10 @@ function getToc(nextPage, volumes_url, max_volumes) {
             if (next.length && max_volumes > 1) {
                 return getToc(Url.resolve(nextPage, next[0].attribs['href']), volumes_url, --max_volumes)
             } else {
+                volumes_url=unique(volumes_url)
                 if (program.verbose > 3)
                     console.dir("Nos of links found: " + volumes_url.length)
-                return getVolumes(unique(volumes_url), [])
+                return getVolumes(volumes_url, [])
             }
         } else {
             console.log(error)
