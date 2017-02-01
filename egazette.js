@@ -146,7 +146,8 @@ function getVolumes(volumes_url, titles) {
         let title = []
         if (Array.isArray(titles) && i in titles)
             title = titles[i]
-        requests.push((function(_url, _title) {
+        requests.push(function() {
+            let _url=url, _title=title
             return baseRequest.get(_url, function(error, response, body) {
                 let new_volumes_url = []
                 let new_titles = []
@@ -167,6 +168,7 @@ function getVolumes(volumes_url, titles) {
                             new_titles.push(t)
                         }
                     })
+                    let requests = []
                     $("a[href$='.pdf']").each(function() {
                         let absolute_url = Url.resolve(_url, this.attribs['href'])
                         if (program.verbose > 3) console.dir("161: getVolumes(): " + absolute_url)
@@ -190,9 +192,10 @@ function getVolumes(volumes_url, titles) {
                             if (!program.search || (program.search && (typeof program.search == "object" && program.search.test(full_title) || full_title.indexOf(program.search) != -1))) {
                                 if (name_suffix != "--" && (!fs.existsSync(output_pathname) || fs.statSync(output_pathname)["size"] == 0)) {
                                     mkdirp.sync(path_parts['dir'])
-                                    if (program.verbose > 0)
-                                        console.log("Saving " + absolute_url + " to " + output_pathname + " of " + _title.join(", "))
 
+                                    requests.push(function() {
+                                        if (program.verbose > 0)
+                                            console.log("Saving " + absolute_url + " to " + output_pathname + " of " + _title.join(", "))
                                         return baseRequest.get(absolute_url).on('error', function(err) {
                                             console.error(err)
                                         }).pipe(fs.createWriteStream(output_pathname).on('error',function(err){
@@ -212,6 +215,8 @@ function getVolumes(volumes_url, titles) {
                             }
                         }
                     })
+                    if (requests.length)
+                        run(requests)
                     if (new_volumes_url.length) {
                         let [u, t] = unique2(new_volumes_url, new_titles)
                         return getVolumes(u, t)
@@ -222,7 +227,20 @@ function getVolumes(volumes_url, titles) {
                 }
 
             })
-        })(url, title))
+        })
+    }
+    run(requests)
+
+}
+
+function run(requests) {
+
+    let request = requests.shift()
+    request()
+    if (requests.length > 0) {
+        setTimeout(function() {
+            run(requests)
+        },program.wait)
     }
 }
 
