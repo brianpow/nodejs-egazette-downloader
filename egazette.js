@@ -199,7 +199,7 @@ function getVolumes(volumes_url, titles) {
                                         return baseRequest.get(absolute_url).on('error', function(err) {
                                             console.error(err)
                                         }).pipe(fs.createWriteStream(output_pathname).on('error',function(err){
-                                            fs.unlink(output_pathname)
+                                            console.error(err)
                                         }))
                                     })
 
