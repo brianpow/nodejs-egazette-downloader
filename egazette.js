@@ -24,16 +24,16 @@ program
     .usage('[options] <no of page>')
     .option('-o, --output <path>', 'Output directory')
     .option('-l, --language <language>', 'Language (chinese or english)', /^(chinese|english)$/, 'chinese')
-    .option('-y, --year <year, ...>', 'Download only issue published in specific year(s) (e.g. "-y 2012-2013,2015,2016-" )', numberList)
-    .option('-l, --volume <volume, ...>', 'Download only specific volume(s), same syntax as --year', numberList)
-    .option('-u, --no <volume number, ...>', 'Download only specific volume numbers(s), same syntax as --year', numberList)
+    .option('-y, --year <year, ...>', 'Download only issue published in specific year(s) (e.g. "-y 2012-2013,2015,2016-" )', yearList)
+    .option('-l, --volume <volume, ...>', 'Download only specific volume(s) (e.g. "-v 1-2,5,9" )', numberList)
+    .option('-u, --no <volume number, ...>', 'Download only specific volume numbers(s), same syntax as --volume', numberList)
     .option('-s, --search <keywords or regular expression>', 'Download only volumes with title contains <keywords> or match <regular expression>', "")
     .option('-g, --gazette-type <volume type, ...>', 'Download only specific type of volume(s) (0=General Issue, 1=Extraordinary Issue)', numberList)
     .option('-n, --notice-type <notice type, ...>', 'Download only specific notice(s) (0=Government Notice,1=Supplement 1,...)', numberList)
     .option('-w, --wait <time in ms>', 'Wait between each wave of pdf download, default is 500ms', parseInt, 500)
     .option('-m, --max-connection <max connection>', 'Maximum simultaneous HTTP connections, default is 4', parseInt, 4)
     .option('-t, --timeout <time in ms>', 'Timeout for each HTTP request, default is 5000ms', parseInt, 5000)
-    .option('-v, --verbose', 'Be more verbose', increaseVerbosity, 0)
+    .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .action(function(noOfPage) {
         baseRequest = request.defaults({
             pool: {
@@ -70,7 +70,7 @@ function isRegExp(val) {
     return null
 }
 
-function numberList(val) {
+function yearList(val) {
     let tmp = val.split(',')
     let tmp2 = []
     for (let i in tmp)
@@ -81,6 +81,23 @@ function numberList(val) {
         if (matches != null) {
             if (!matches[2])
                 matches[2] = new Date().getFullYear()
+            for (let j = Number(matches[1]); j <= Number(matches[2]); j++)
+                tmp2.push(j)
+        }
+    }
+
+    return unique(tmp2)
+}
+
+function numberList(val) {
+    let tmp = val.split(',')
+    let tmp2 = []
+    for (let i in tmp)
+        if (!isNaN(tmp[i]))
+            tmp2.push(Number(tmp[i]))
+    else {
+        let matches = tmp[i].match(/^(\d+)-(\d+)$/)
+        if (matches != null) {
             for (let j = Number(matches[1]); j <= Number(matches[2]); j++)
                 tmp2.push(j)
         }
