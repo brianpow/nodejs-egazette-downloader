@@ -33,13 +33,15 @@ program
     .option('-w, --wait <time in ms>', 'Wait between each wave of pdf download, default is 500ms', parseInt, 500)
     .option('-m, --max-connection <max connection>', 'Maximum simultaneous HTTP connections, default is 4', parseInt, 4)
     .option('-t, --timeout <time in ms>', 'Timeout for each HTTP request, default is 5000ms', parseInt, 5000)
+    .option('-a, --user-agent <user agent>', 'User agent in HTTP request header, default is "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1')
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .action(function(noOfPage) {
         baseRequest = request.defaults({
             pool: {
                 maxSockets: program.maxConnection
             },
-            timeout: program.timeout
+            timeout: program.timeout,
+            headers: {'User-Agent': program.userAgent}
         })
 
         let re = isRegExp(program.search)
