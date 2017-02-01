@@ -6,11 +6,11 @@ var fs = require("fs")
 var path = require("path")
 var Url = require("url")
 var cheerio = require("cheerio")
-var request = require('request-defaults');
-var unique = require('array-unique');
-var program = require('commander');
-var process = require('process');
-var sanitize = require("sanitize-filename");
+var request = require('request-defaults')
+var unique = require('array-unique')
+var program = require('commander')
+var process = require('process')
+var sanitize = require("sanitize-filename")
 
 var main = {
     chinese: 'http://www.gld.gov.hk/egazette/tc_chi/gazette/toc.php',
@@ -48,11 +48,11 @@ program
         noOfPage = noOfPage || 5
         getToc(main[program.language], [], noOfPage)
     })
-    .parse(process.argv);
+    .parse(process.argv)
 program.output = program.output || process.cwd()
 
 function increaseVerbosity(v, total) {
-    return total + 1;
+    return total + 1
 }
 
 function pushUnique(arr, val) {
@@ -86,7 +86,7 @@ function numberList(val) {
         }
     }
 
-    return unique(tmp2);
+    return unique(tmp2)
 }
 
 function getToc(nextPage, volumes_url, max_volumes) {
@@ -104,7 +104,7 @@ function getToc(nextPage, volumes_url, max_volumes) {
                         if (!program.volume || program.volume.indexOf(parseInt(uri.query.volume)) != -1)
                             if (!program.no || program.no.indexOf(parseInt(uri.query.no)) != -1)
                                 pushUnique(volumes_url, Url.resolve(nextPage, this.attribs['href']))
-            });
+            })
 
             let next = $("img[name=nextBtn]").parent()
             if (next.length && max_volumes > 1) {
@@ -148,7 +148,7 @@ function getVolumes(volumes_url, titles) {
                             t.push($(this).text().trim())
                             new_titles.push(t)
                         }
-                    });
+                    })
                     $("a[href$='.pdf']").each(function() {
                         let absolute_url = Url.resolve(_url, this.attribs['href'])
                         if (program.verbose > 3) console.dir("161: getVolumes(): " + absolute_url)
@@ -209,25 +209,25 @@ function getVolumes(volumes_url, titles) {
 
 function unique2(arr, arr2) {
     if (!Array.isArray(arr) || !Array.isArray(arr2)) {
-        throw new TypeError('array-unique expects an array.');
+        throw new TypeError('array-unique expects an array.')
     }
 
     if (arr.length != arr2.length) {
-        throw new TypeError('array-unique expects two array should be the same size.');
+        throw new TypeError('array-unique expects two array should be the same size.')
     }
 
-    var len = arr.length;
-    var i = -1;
+    var len = arr.length
+    var i = -1
 
     while (i++ < len) {
-        var j = i + 1;
+        var j = i + 1
 
         for (; j < arr.length; ++j) {
             if (arr[i] === arr[j]) {
-                arr.splice(j--, 1);
-                arr2.splice(j--, 1);
+                arr.splice(j--, 1)
+                arr2.splice(j--, 1)
             }
         }
     }
-    return [arr, arr2];
-};
+    return [arr, arr2]
+}
