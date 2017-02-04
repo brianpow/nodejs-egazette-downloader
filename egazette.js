@@ -35,6 +35,7 @@ program
     .option('-t, --timeout <time in ms>', 'Timeout for each HTTP request, default is 5000ms', parseInt, 5000)
     .option('-r, --retry <count>', 'Retry if HTTP connections failed, default is 10', parseInt, 10)
     .option('-a, --user-agent <user agent>', 'User agent in HTTP request header, default is "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1')
+    .option('-d, --no-download', 'Don\'t save any pdf files')
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .action(function(noOfPage) {
         baseRequest = request.defaults({
@@ -179,6 +180,8 @@ function getVolumes(volumes_url, titles) {
                         let absolute_url = Url.resolve(_url, this.attribs['href'])
                         if (program.verbose > 3) console.dir("161: getVolumes(): " + absolute_url)
                         let full_title = _title.join(", ") + ", " + $(this).text().trim()
+                        if (!program.noDownload)
+                        {
                         if (downloaded_pdf.indexOf(absolute_url) == -1 && !$(this).text().match(/^\d+$/) && !$(this).text() != "--") {
 
                             let url_parts = Url.parse(absolute_url)
@@ -220,6 +223,7 @@ function getVolumes(volumes_url, titles) {
 
                             }
                         }
+                    }
                     })
                     if (requests.length)
                         run(requests)
