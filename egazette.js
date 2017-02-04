@@ -58,7 +58,7 @@ program
             program.search = new RegExp(re[0], re[1])
 
         noOfPage = noOfPage || 5
-        getToc(main[program.language], [], noOfPage)
+        getToc(main[program.language], [], noOfPage).then(getVolumes)
     })
     .parse(process.argv)
 
@@ -118,7 +118,11 @@ function numberList(val) {
 }
 
 function getToc(nextPage, volumes_url, max_volumes) {
-    return baseRequest.get(nextPage, function(error, response, body) {
+    console.log("Parsing TOC..")
+    return new Promise(function(resolve,reject)
+    {
+        function get(nextPage, volumes_url, max_volumes){
+            return baseRequest.get(nextPage, function(error, response, body) {
         if (!error && response.statusCode == 200) {
             let $ = cheerio.load(body)
             if (program.verbose > 2)
@@ -136,17 +140,20 @@ function getToc(nextPage, volumes_url, max_volumes) {
 
             let next = $("img[name=nextBtn]").parent()
             if (next.length && max_volumes > 1) {
-                return getToc(Url.resolve(nextPage, next[0].attribs['href']), volumes_url, --max_volumes)
+                return get(Url.resolve(nextPage, next[0].attribs['href']), volumes_url, --max_volumes)
             } else {
-                volumes_url=unique(volumes_url)
-                if (program.verbose > 3)
-                    console.dir("Nos of links found: " + volumes_url.length)
-                return getVolumes(volumes_url, [])
+                volumes_url = unique(volumes_url)
+                console.log("done! %d links found",volumes_url.length)
+                return resolve(volumes_url)
             }
         } else {
-            console.log(error)
+            reject(error)
         }
     })
+}
+get(nextPage, volumes_url, max_volumes)
+
+})
 }
 
 function getVolumes(volumes_url, titles) {
