@@ -34,6 +34,7 @@ program
     .option('-m, --max-connection <max connection>', 'Maximum simultaneous HTTP connections, default is 4', parseInt, 4)
     .option('-t, --timeout <time in ms>', 'Timeout for each HTTP request, default is 5000ms', parseInt, 5000)
     .option('-r, --retry <count>', 'Retry if HTTP connections failed, default is 10', parseInt, 10)
+    .option('-R, --retry-delay <time in ms>', 'Retry dealy if HTTP connections failed, default is 10000ms', parseInt, 10000)
     .option('-a, --user-agent <user agent>', 'User agent in HTTP request header, default is "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1')
     .option('-d, --no-download', 'Don\'t save any pdf files')
     .option('-e, --export <path>', 'Append found pdf links and title in tab separated format, default is "_url.txt" in output directory', "_url.txt")
@@ -41,7 +42,7 @@ program
     .action(function(noOfPage) {
         baseRequest = request.defaults({
             maxAttempts: program.retry,
-            retryDelay: 10000,
+            retryDelay: program.retryDelay,
             pool: {
                 maxSockets: program.maxConnection
             },
