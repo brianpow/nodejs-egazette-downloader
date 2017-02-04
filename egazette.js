@@ -250,13 +250,14 @@ function getVolumes(volumes_url, titles) {
 }
 
 function run(requests) {
-
-    let request = requests.shift()
-    request()
     if (requests.length > 0) {
-        setTimeout(function() {
-            run(requests)
-        },program.wait)
+        let request = requests.shift()
+        request()
+        if (requests.length > 0) {
+            setTimeout(function() {
+                run(requests)
+            }, program.wait)
+        }
     }
 }
 
