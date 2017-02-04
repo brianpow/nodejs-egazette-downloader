@@ -6,7 +6,7 @@ var fs = require('graceful-fs')
 var path = require("path")
 var Url = require("url")
 var cheerio = require("cheerio")
-var request = require('request-defaults')
+var request = require('requestretry')
 var unique = require('array-unique')
 var program = require('commander')
 var process = require('process')
@@ -33,10 +33,13 @@ program
     .option('-w, --wait <time in ms>', 'Wait between each wave of pdf download, default is 500ms', parseInt, 500)
     .option('-m, --max-connection <max connection>', 'Maximum simultaneous HTTP connections, default is 4', parseInt, 4)
     .option('-t, --timeout <time in ms>', 'Timeout for each HTTP request, default is 5000ms', parseInt, 5000)
+    .option('-r, --retry <count>', 'Retry if HTTP connections failed, default is 10', parseInt, 10)
     .option('-a, --user-agent <user agent>', 'User agent in HTTP request header, default is "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1')
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .action(function(noOfPage) {
         baseRequest = request.defaults({
+            maxAttempts: program.retry,
+            retryDelay: 10000,
             pool: {
                 maxSockets: program.maxConnection
             },
@@ -47,6 +50,7 @@ program
         let re = isRegExp(program.search)
         if (re)
             program.search = new RegExp(re[0], re[1])
+
         noOfPage = noOfPage || 5
         getToc(main[program.language], [], noOfPage)
     })

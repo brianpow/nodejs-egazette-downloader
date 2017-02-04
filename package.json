@@ -10,6 +10,7 @@
     "graceful-fs": "^4.1.11",
     "mkdirp": "^0.5.1",
     "request-defaults": "^1.2.0",
+    "requestretry": "^1.12.0",
     "sanitize-filename": "^1.6.1"
   },
   "devDependencies": {},
