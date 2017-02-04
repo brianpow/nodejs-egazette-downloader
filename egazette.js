@@ -169,7 +169,7 @@ function getVolumes(volumes_url, titles) {
                         if (!program.noticeType || program.noticeType.indexOf(parseInt(uri.query.type)) != -1) {
                             let new_url = Url.resolve(_url, this.attribs['href'])
                             new_volumes_url.push(new_url)
-                            let t = _title.splice()
+                            let t = _title.concat()
                             t.push($(this).text().trim())
                             new_titles.push(t)
                         }
