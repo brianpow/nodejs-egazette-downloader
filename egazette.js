@@ -36,6 +36,7 @@ program
     .option('-r, --retry <count>', 'Retry if HTTP connections failed, default is 10', parseInt, 10)
     .option('-a, --user-agent <user agent>', 'User agent in HTTP request header, default is "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1')
     .option('-d, --no-download', 'Don\'t save any pdf files')
+    .option('-e, --export <path>', 'Append found pdf links and title in tab separated format, default is "_url.txt" in output directory', "_url.txt")
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .action(function(noOfPage) {
         baseRequest = request.defaults({
@@ -48,6 +49,9 @@ program
             headers: {'User-Agent': program.userAgent}
         })
 
+        program.output = program.output || process.cwd()
+        if (program.export)
+            program.export = path.join(program.output, program.export)
         let re = isRegExp(program.search)
         if (re)
             program.search = new RegExp(re[0], re[1])
@@ -56,7 +60,6 @@ program
         getToc(main[program.language], [], noOfPage)
     })
     .parse(process.argv)
-program.output = program.output || process.cwd()
 
 function increaseVerbosity(v, total) {
     return total + 1
@@ -180,6 +183,8 @@ function getVolumes(volumes_url, titles) {
                         let absolute_url = Url.resolve(_url, this.attribs['href'])
                         if (program.verbose > 3) console.dir("161: getVolumes(): " + absolute_url)
                         let full_title = _title.join(", ") + ", " + $(this).text().trim()
+                        if (program.export)
+                            fs.appendFileSync(program.export, [absolute_url].concat(_title).concat([$(this).text().trim()]).join("\t") + "\n")
                         if (!program.noDownload)
                         {
                         if (downloaded_pdf.indexOf(absolute_url) == -1 && !$(this).text().match(/^\d+$/) && !$(this).text() != "--") {
