@@ -7,6 +7,7 @@
     "array-unique": "^0.3.2",
     "bluebird": "^3.4.7",
     "cheerio": "^0.22.0",
+    "graceful-fs": "^4.1.11",
     "mkdirp": "^0.5.1",
     "request-defaults": "^1.2.0",
     "sanitize-filename": "^1.6.1"

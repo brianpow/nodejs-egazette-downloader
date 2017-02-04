@@ -2,7 +2,7 @@
 
 var Promise = require("bluebird")
 var mkdirp = require("mkdirp")
-var fs = require("fs")
+var fs = require('graceful-fs')
 var path = require("path")
 var Url = require("url")
 var cheerio = require("cheerio")
