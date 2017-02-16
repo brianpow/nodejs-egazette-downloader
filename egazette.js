@@ -37,7 +37,7 @@ program
     .option('-R, --retry-delay <time in ms>', 'Retry dealy if HTTP connections failed, default is 10000ms', parseInt, 10000)
     .option('-a, --user-agent <user agent>', 'User agent in HTTP request header, default is "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1')
     .option('-d, --no-download', 'Don\'t save any pdf files')
-    .option('-e, --export <path>', 'Append found pdf links and title in tab separated format, default is "_url.txt" in output directory', "_url.txt")
+    .option('-e, --export <path>', 'Append found pdf links and title in tab separated format, default is "_url.txt" in output directory')
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .action(function(noOfPage) {
         baseRequest = request.defaults({
@@ -51,7 +51,7 @@ program
                 'User-Agent': program.userAgent
             }
         })
-        
+
         program.output = program.output || process.cwd()
         if (program.export)
             program.export = path.join(program.output, program.export)
