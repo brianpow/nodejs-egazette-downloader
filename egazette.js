@@ -47,18 +47,23 @@ program
                 maxSockets: program.maxConnection
             },
             timeout: program.timeout,
-            headers: {'User-Agent': program.userAgent}
+            headers: {
+                'User-Agent': program.userAgent
+            }
         })
-
+        
         program.output = program.output || process.cwd()
         if (program.export)
             program.export = path.join(program.output, program.export)
+
         let re = isRegExp(program.search)
         if (re)
             program.search = new RegExp(re[0], re[1])
 
         noOfPage = noOfPage || 5
-        getToc(main[program.language], [], noOfPage).then(getVolumes)
+        getToc(main[program.language], [], noOfPage).then(getVolumes).catch(function(err) {
+            console.error(err)
+        }).finally(removeDupe)
     })
     .parse(process.argv)
 
@@ -70,6 +75,19 @@ function pushUnique(arr, val) {
     if (Array.isArray(arr) && arr.indexOf(val) == -1)
         arr.push(val)
     return arr
+}
+
+function removeDupe() {
+    if (program.export) {
+        console.log("Removing duplicate links...")
+        let rows = fs.readFileSync(program.export, {
+            encoding: "utf8"
+        }).split("\n")
+        rows = unique(rows)
+        fs.writeFileSync(file, rows.join("\n"))
+        console.log("All done!")
+
+    }
 }
 
 function isRegExp(val) {
@@ -119,141 +137,148 @@ function numberList(val) {
 
 function getToc(nextPage, volumes_url, max_volumes) {
     console.log("Parsing TOC..")
-    return new Promise(function(resolve,reject)
-    {
-        function get(nextPage, volumes_url, max_volumes){
+    return new Promise(function(resolve, reject) {
+        function get(nextPage, volumes_url, max_volumes) {
             return baseRequest.get(nextPage, function(error, response, body) {
-        if (!error && response.statusCode == 200) {
-            let $ = cheerio.load(body)
-            if (program.verbose > 2)
-                console.dir("Parsing: " + nextPage)
-            $("a[href^='volume.php']").each(function() {
-                let uri = Url.parse(this.attribs['href'], {
-                    parseQueryString: true
-                })
-                if (!program.gazetteType || program.gazetteType.indexOf(parseInt(uri.query.extra)) != -1)
-                    if (!program.year || program.year.indexOf(parseInt(uri.query.year)) != -1)
-                        if (!program.volume || program.volume.indexOf(parseInt(uri.query.volume)) != -1)
-                            if (!program.no || program.no.indexOf(parseInt(uri.query.no)) != -1)
-                                pushUnique(volumes_url, Url.resolve(nextPage, this.attribs['href']))
-            })
-
-            let next = $("img[name=nextBtn]").parent()
-            if (next.length && max_volumes > 1) {
-                return get(Url.resolve(nextPage, next[0].attribs['href']), volumes_url, --max_volumes)
-            } else {
-                volumes_url = unique(volumes_url)
-                console.log("done! %d links found",volumes_url.length)
-                return resolve(volumes_url)
-            }
-        } else {
-            reject(error)
-        }
-    })
-}
-get(nextPage, volumes_url, max_volumes)
-
-})
-}
-
-function getVolumes(volumes_url, titles) {
-    let requests = []
-    let downloaded_pdf = []
-    for (let i in volumes_url) {
-        let url = volumes_url[i]
-        let title = []
-        if (Array.isArray(titles) && i in titles)
-            title = titles[i]
-        requests.push(function() {
-            let _url=url, _title=title
-            return baseRequest.get(_url, function(error, response, body) {
-                let new_volumes_url = []
-                let new_titles = []
                 if (!error && response.statusCode == 200) {
-                    if (program.verbose > 3) console.log("Downloading " + _url + " success!")
                     let $ = cheerio.load(body)
-
-                    $("a[href^='?year=']").each(function() {
-                        if (program.verbose > 3) console.dir("148: getVolumes(): " + Url.resolve(_url, this.attribs['href']))
+                    if (program.verbose > 2)
+                        console.dir("Parsing: " + nextPage)
+                    $("a[href^='volume.php']").each(function() {
                         let uri = Url.parse(this.attribs['href'], {
                             parseQueryString: true
                         })
-                        if (!program.noticeType || program.noticeType.indexOf(parseInt(uri.query.type)) != -1) {
-                            let new_url = Url.resolve(_url, this.attribs['href'])
-                            new_volumes_url.push(new_url)
-                            let t = _title.concat()
-                            t.push($(this).text().trim())
-                            new_titles.push(t)
-                        }
+
+                        if (!program.gazetteType || program.gazetteType.indexOf(parseInt(uri.query.extra)) != -1)
+                            if (!program.year || program.year.indexOf(parseInt(uri.query.year)) != -1)
+                                if (!program.volume || program.volume.indexOf(parseInt(uri.query.volume)) != -1)
+                                    if (!program.no || program.no.indexOf(parseInt(uri.query.no)) != -1)
+                                        pushUnique(volumes_url, Url.resolve(nextPage, this.attribs['href']))
                     })
-                    let requests = []
-                    $("a[href$='.pdf']").each(function() {
-                        let absolute_url = Url.resolve(_url, this.attribs['href'])
-                        if (program.verbose > 3) console.dir("161: getVolumes(): " + absolute_url)
-                        let full_title = _title.join(", ") + ", " + $(this).text().trim()
-                        if (program.export)
-                            fs.appendFileSync(program.export, [absolute_url].concat(_title).concat([$(this).text().trim()]).join("\t") + "\n")
-                        if (!program.noDownload)
-                        {
-                        if (downloaded_pdf.indexOf(absolute_url) == -1 && !$(this).text().match(/^\d+$/) && !$(this).text() != "--") {
 
-                            let url_parts = Url.parse(absolute_url)
-                            let path_parts
-
-                            if (path.sep == "\\")
-                                path_parts = path.parse(program.output + url_parts['path'].replace(/\//g, "\\"))
-                            else
-                                path_parts = path.parse(program.output + url_parts['path'])
-                            let name_suffix = sanitize($(this).text().replace(path_parts['name'], ""), {
-                                replacement: "-"
-                            })
-
-                            path_parts['base'] = sanitize(path_parts['name'] + " " + name_suffix + path_parts['ext'])
-                            let output_pathname = path.format(path_parts)
-
-                            if (!program.search || (program.search && (typeof program.search == "object" && program.search.test(full_title) || full_title.indexOf(program.search) != -1))) {
-                                if (name_suffix != "--" && (!fs.existsSync(output_pathname) || fs.statSync(output_pathname)["size"] == 0)) {
-                                    mkdirp.sync(path_parts['dir'])
-
-                                    requests.push(function() {
-                                        if (program.verbose > 0)
-                                            console.log("Saving " + absolute_url + " to " + output_pathname + " of " + _title.join(", "))
-                                        return baseRequest.get(absolute_url).on('error', function(err) {
-                                            console.error(err)
-                                        }).pipe(fs.createWriteStream(output_pathname).on('error',function(err){
-                                            console.error(err)
-                                        }))
-                                    })
-
-                                } else {
-                                    downloaded_pdf.push(absolute_url)
-                                    if (program.verbose > 1)
-                                        console.log("[File Exists] Skipping " + absolute_url + " to " + output_pathname + " of " + _title.join(", "))
-                                }
-                            } else {
-                                if (program.verbose > 1)
-                                    console.log("[Text Unmatched] Skipping " + absolute_url + " to " + output_pathname + " of " + _title.join(", ") + " because of unmatchedd search filter")
-
-                            }
-                        }
-                    }
-                    })
-                    if (requests.length)
-                        run(requests)
-                    if (new_volumes_url.length) {
-                        let [u, t] = unique2(new_volumes_url, new_titles)
-                        return getVolumes(u, t)
+                    let next = $("img[name=nextBtn]").parent()
+                    if (next.length && max_volumes > 1) {
+                        return get(Url.resolve(nextPage, next[0].attribs['href']), volumes_url, --max_volumes)
+                    } else {
+                        volumes_url = unique(volumes_url)
+                        console.log("done! %d links found", volumes_url.length)
+                        resolve(volumes_url)
                     }
                 } else {
-                    console.error("Downloading " + url + " with text " + _title.join(", ") + " failed")
-                    console.error(error)
+                    reject(error)
                 }
-
             })
-        })
-    }
-    run(requests)
+        }
+        get(nextPage, volumes_url, max_volumes)
 
+    })
+}
+
+function resize(arr, size, defval) {
+    var delta = arr.length - size;
+
+    if (delta > 0) {
+        arr.length = size;
+    } else {
+        while (delta++ < 0) {
+            arr.push(defval);
+        }
+    }
+}
+
+function getVolumes(volume_urls) {
+    return new Promise(function(resolve, reject) {
+        function get(volume_urls, volume_titles, pdf_urls, pdf_titles) {
+            if (!Array.isArray(volume_titles))
+                volume_titles = []
+
+            resize(volume_titles, volume_urls.length, [])
+
+            let requests = []
+            let downloaded_pdf = []
+
+            for (let i in volume_urls) {
+                let url = volume_urls[i]
+                let title = volume_titles[i]
+
+                requests.push((function(_url, _title) {
+                    return function() {
+
+                        baseRequest.get(_url, function(error, response, body) {
+
+                            let new_volumes_url = []
+                            let new_titles = []
+                            if (!error && response.statusCode == 200) {
+                                if (program.verbose > 3) console.log("Downloading " + _url + " success!")
+                                let $ = cheerio.load(body)
+                                let x = parseUrls($, _url, _title)
+                                new_volumes_url = x[0], new_titles = x[1]
+
+                                let requests = []
+                                $("a[href$='.pdf']").each(function() {
+                                    let absolute_url = Url.resolve(_url, this.attribs['href'])
+
+                                    if (program.verbose > 3) console.dir("getVolumes(): URL found: " + absolute_url)
+                                    let full_title = _title.join(", ") + ", " + $(this).text().trim()
+                                    if (program.export)
+                                        fs.appendFileSync(program.export, [absolute_url].concat(_title).concat([$(this).text().trim()]).join("\t") + "\n")
+                                    if (!program.noDownload) {
+                                        if (downloaded_pdf.indexOf(absolute_url) == -1 && !$(this).text().match(/^\d+$/) && !$(this).text() != "--") {
+
+                                            let url_parts = Url.parse(absolute_url)
+                                            let path_parts
+
+                                            if (path.sep == "\\")
+                                                path_parts = path.parse(program.output + url_parts['path'].replace(/\//g, "\\"))
+                                            else
+                                                path_parts = path.parse(program.output + url_parts['path'])
+                                            let name_suffix = sanitize($(this).text().replace(path_parts['name'], ""), {
+                                                replacement: "-"
+                                            })
+
+                                            path_parts['base'] = sanitize(path_parts['name'] + " " + name_suffix + path_parts['ext'])
+                                            let output_pathname = path.format(path_parts)
+
+                                            if (!program.search || (program.search && (typeof program.search == "object" && program.search.test(full_title) || full_title.indexOf(program.search) != -1))) {
+                                                if (name_suffix != "--") {
+                                                    mkdirp.sync(path_parts['dir'])
+
+                                                    requests.push((function(absolute_url, output_pathname, _title) {
+                                                        return function() {
+                                                            return save(absolute_url, output_pathname, _title)
+                                                        }
+                                                    })(absolute_url, output_pathname, _title))
+
+                                                    downloaded_pdf.push(absolute_url)
+                                                }
+                                            } else {
+                                                if (program.verbose > 1)
+                                                    console.log("[Text Unmatched] Skipping " + absolute_url + " to " + output_pathname + " of " + _title.join(", ") + " because of unmatchedd search filter")
+
+                                            }
+                                        }
+                                    }
+                                })
+                                if (requests.length)
+                                    run(requests)
+                                if (new_volumes_url.length) {
+
+                                    let [u, t] = unique2(new_volumes_url, new_titles)
+                                    return get(u, t)
+                                }
+                            } else {
+                                console.error("Downloading " + url + " with text " + _title.join(", ") + " failed")
+                                console.error(error)
+                            }
+
+                        })
+                    }
+                })(url, title))
+            }
+            run(requests)
+        }
+        get(volume_urls)
+    })
 }
 
 function run(requests) {
@@ -266,6 +291,28 @@ function run(requests) {
             }, program.wait)
         }
     }
+}
+
+function parseUrls($, url, title) {
+    let new_volumes_url = [],
+        new_titles = []
+
+    $("a[href^='?year=']").each(function() {
+        if (program.verbose > 3) console.dir("getVolumes(): URL found: " + Url.resolve(url, this.attribs['href']))
+        let uri = Url.parse(this.attribs['href'], {
+            parseQueryString: true
+        })
+        if (!program.noticeType || program.noticeType.indexOf(parseInt(uri.query.type)) != -1) {
+            let new_url = Url.resolve(url, this.attribs['href'])
+            new_volumes_url.push(new_url)
+            let new_title = title.concat()
+
+            new_title.push($(this).text().trim())
+            new_titles.push(new_title)
+        }
+    })
+
+    return [new_volumes_url, new_titles]
 }
 
 function unique2(arr, arr2) {
@@ -291,4 +338,40 @@ function unique2(arr, arr2) {
         }
     }
     return [arr, arr2]
+}
+
+function _save(url, file, aTime, mTime) {
+    let fileStream = fs.createWriteStream(file).on('finish', function() {
+        fs.utimeSync(file, aTime, mTime)
+    })
+    return baseRequest.get(url).pipe(fileStream)
+
+}
+
+function save(url, file, _title) {
+    return baseRequest.head(url).then(function(data) {
+        let mTime = Date.parse(data.headers['last-modified']) / 1000
+        let stat = []
+        try {
+            stat = fs.statSync(file)
+        } catch (e) {
+
+            if (program.verbose > 0)
+                console.log("[New File] Saving " + url + " to " + file + " of " + _title.join(", "))
+            _save(url, file, new Date(), mTime)
+
+        }
+
+        if (stat['size'] != parseInt(data.headers['content-length'])) {
+            if (program.verbose > 0)
+                console.log("[Wrong File Size] Saving " + url + " to " + file + " of " + _title.join(", "))
+            _save(url, file, stat['atime'], mTime)
+        } else {
+
+            if (program.verbose > 1)
+                console.log("[File Exists] Skipping " + url + " to " + file + " of " + _title.join(", "))
+            if (stat)
+                fs.utimeSync(file, new Date(), mTime)
+        }
+    })
 }
