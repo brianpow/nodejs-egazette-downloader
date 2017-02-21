@@ -91,15 +91,21 @@ function pushUnique(arr, val) {
 
 function removeDupe() {
     if (program.export) {
-        console.log("Removing duplicate links...")
-        let rows = fs.readFileSync(program.export, {
-            encoding: "utf8"
-        }).split("\n")
-        rows = unique(rows)
-        fs.writeFileSync(file, rows.join("\n"))
-        console.log("All done!")
-
+        fs.stat(program.export, (err, stats) => {
+            if(!err)
+            {
+            console.log("Removing duplicate links...")
+            let rows = fs.readFileSync(program.export, {
+                encoding: "utf8"
+            }).split("\n")
+            rows = unique(rows)
+            fs.writeFileSync(program.export, rows.join("\n"))
+            }
+            console.log("All done!")
+        })
     }
+    else
+        console.log("All done!")
 }
 
 function isRegExp(val) {
