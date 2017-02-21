@@ -62,8 +62,8 @@ program
         if (re)
             program.search = new RegExp(re[0], re[1])
 
-        _noOfPages = parseInt(_noOfPages)
-        if (_noOfPages)
+        noOfPages = parseInt(_noOfPages)
+        if (noOfPages)
             getToc(main[program.language], [], _noOfPages).then(getVolumes).catch(function(err) {
                 console.error(err)
             }).finally(removeDupe)
