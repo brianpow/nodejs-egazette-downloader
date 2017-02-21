@@ -18,6 +18,7 @@ var main = {
 }
 
 var baseRequest
+var noOfPages
 
 program
     .version('0.0.1')
@@ -39,7 +40,8 @@ program
     .option('-d, --no-download', 'Don\'t save any pdf files')
     .option('-e, --export <path>', 'Append found pdf links and title in tab separated format, default is "_url.txt" in output directory')
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
-    .action(function(noOfPage) {
+    .arguments('<no of pages>')
+    .action(function(_noOfPages) {
         baseRequest = request.defaults({
             maxAttempts: program.retry,
             retryDelay: program.retryDelay,
@@ -60,13 +62,23 @@ program
         if (re)
             program.search = new RegExp(re[0], re[1])
 
-        noOfPage = noOfPage || 5
-        getToc(main[program.language], [], noOfPage).then(getVolumes).catch(function(err) {
+        _noOfPages = parseInt(_noOfPages)
+        if(_noOfPages)
+        getToc(main[program.language], [], _noOfPages).then(getVolumes).catch(function(err) {
             console.error(err)
         }).finally(removeDupe)
+        else {
+            program.outputHelp()
+            process.exit(1)
+        }
     })
     .parse(process.argv)
 
+if(!noOfPages || !parseInt(noOfPages))
+{
+    program.outputHelp()
+    process.exit(1)
+}
 function increaseVerbosity(v, total) {
     return total + 1
 }
