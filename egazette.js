@@ -38,7 +38,7 @@ program
     .option('-R, --retry-delay <time in ms>', 'Retry dealy if HTTP connections failed, default is 60000ms', parseInt, 60000)
     .option('-a, --user-agent <user agent>', 'User agent in HTTP request header, default is "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1')
     .option('-d, --no-download', 'Don\'t save any pdf files')
-    .option('-e, --export <path>', 'Append found pdf links and title in tab separated format, default is "_url.txt" in output directory')
+    .option('-e, --export <path>', 'Append found pdf links and title in tab separated format')
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .arguments('<no of pages>')
     .action(function(_noOfPages) {
