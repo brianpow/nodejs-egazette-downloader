@@ -21,7 +21,7 @@ var baseRequest
 
 program
     .version('0.0.1')
-    .usage('[options] <no of page>')
+    .usage('[options] <no of pages>')
     .option('-o, --output <path>', 'Output directory')
     .option('-l, --language <language>', 'Language (chinese or english)', /^(chinese|english)$/, 'chinese')
     .option('-y, --year <year, ...>', 'Download only issue published in specific year(s) (e.g. "-y 2012-2013,2015,2016-" )', yearList)
