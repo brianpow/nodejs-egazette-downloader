@@ -63,10 +63,10 @@ program
             program.search = new RegExp(re[0], re[1])
 
         _noOfPages = parseInt(_noOfPages)
-        if(_noOfPages)
-        getToc(main[program.language], [], _noOfPages).then(getVolumes).catch(function(err) {
-            console.error(err)
-        }).finally(removeDupe)
+        if (_noOfPages)
+            getToc(main[program.language], [], _noOfPages).then(getVolumes).catch(function(err) {
+                console.error(err)
+            }).finally(removeDupe)
         else {
             program.outputHelp()
             process.exit(1)
@@ -74,11 +74,11 @@ program
     })
     .parse(process.argv)
 
-if(!noOfPages || !parseInt(noOfPages))
-{
+if (!noOfPages || !parseInt(noOfPages)) {
     program.outputHelp()
     process.exit(1)
 }
+
 function increaseVerbosity(v, total) {
     return total + 1
 }
@@ -92,19 +92,17 @@ function pushUnique(arr, val) {
 function removeDupe() {
     if (program.export) {
         fs.stat(program.export, (err, stats) => {
-            if(!err)
-            {
-            console.log("Removing duplicate links...")
-            let rows = fs.readFileSync(program.export, {
-                encoding: "utf8"
-            }).split("\n")
-            rows = unique(rows)
-            fs.writeFileSync(program.export, rows.join("\n"))
+            if (!err) {
+                console.log("Removing duplicate links...")
+                let rows = fs.readFileSync(program.export, {
+                    encoding: "utf8"
+                }).split("\n")
+                rows = unique(rows)
+                fs.writeFileSync(program.export, rows.join("\n"))
             }
             console.log("All done!")
         })
-    }
-    else
+    } else
         console.log("All done!")
 }
 
@@ -286,7 +284,10 @@ function getVolumes(volume_urls) {
                                 }
                             } else {
                                 console.error("Downloading " + url + " with text " + _title.join(", ") + " failed")
-                                console.error(error)
+                                if (!error)
+                                    console.log(response);
+                                else
+                                    console.error(error)
                             }
 
                         })
@@ -360,7 +361,9 @@ function unique2(arr, arr2) {
 
 function _save(url, file, aTime, mTime) {
     let fileStream = fs.createWriteStream(file).on('finish', function() {
-        fs.utimeSync(file, aTime, mTime)
+        if (program.verbose > 2)
+            console.log("[Fix Date] %s to %s", file, mTime)
+        fs.utimesSync(file, aTime, mTime)
     })
     return baseRequest.get(url).pipe(fileStream)
 
@@ -368,28 +371,37 @@ function _save(url, file, aTime, mTime) {
 
 function save(url, file, _title) {
     return baseRequest.head(url).then(function(data) {
-        let mTime = Date.parse(data.headers['last-modified']) / 1000
-        let stat = []
+        let mTime = null
+        if (data.headers['last-modified'])
+            mTime = parseInt(Date.parse(data.headers['last-modified']) / 1000)
+        let localFileTime = null
+        let stat = {}
         try {
             stat = fs.statSync(file)
+            localFileTime = parseInt(Date.parse(stat['mtime']) / 1000)
         } catch (e) {
 
             if (program.verbose > 0)
                 console.log("[New File] Saving " + url + " to " + file + " of " + _title.join(", "))
             _save(url, file, new Date(), mTime)
-
+            return;
         }
 
-        if (stat['size'] != parseInt(data.headers['content-length'])) {
+
+        if ('size' in stat && stat['size'] != parseInt(data.headers['content-length'])) {
             if (program.verbose > 0)
-                console.log("[Wrong File Size] Saving " + url + " to " + file + " of " + _title.join(", "))
+                console.log("[Wrong File Size] Saving " + url + " to " + file + " of " + _title.join(", ") + " local %s vs remote %s", stat['size'], data.headers['content-length'])
             _save(url, file, stat['atime'], mTime)
         } else {
-
             if (program.verbose > 1)
                 console.log("[File Exists] Skipping " + url + " to " + file + " of " + _title.join(", "))
-            if (stat)
-                fs.utimeSync(file, new Date(), mTime)
+            if (localFileTime !== null && mTime !== null && localFileTime != mTime) {
+                if (program.verbose > 2)
+                    console.log("[Fix Date] %s from %s to %s", file, localFileTime, mTime)
+                fs.utimesSync(file, new Date(), mTime)
+            }
         }
+    }, function(error) {
+        console.error(error)
     })
 }
