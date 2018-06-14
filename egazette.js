@@ -26,7 +26,7 @@ program
     .option('-o, --output <path>', 'Output directory')
     .option('-l, --language <language>', 'Language (chinese or english)', /^(chinese|english)$/, 'chinese')
     .option('-y, --year <year, ...>', 'Download only issue published in specific year(s) (e.g. "-y 2012-2013,2015,2016-" )', yearList)
-    .option('-l, --volume <volume, ...>', 'Download only specific volume(s) (e.g. "-v 1-2,5,9" )', numberList)
+    .option('-E, --volume <volume, ...>', 'Download only specific volume(s) (e.g. "-E 1-2,5,9" )', numberList)
     .option('-u, --no <volume number, ...>', 'Download only specific volume numbers(s), same syntax as --volume', numberList)
     .option('-s, --search <keywords or regular expression>', 'Download only volumes with title contains <keywords> or match <regular expression>', "")
     .option('-g, --gazette-type <volume type, ...>', 'Download only specific type of volume(s) (0=General Issue, 1=Extraordinary Issue)', numberList)
