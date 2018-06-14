@@ -6,24 +6,48 @@ var fs = require('graceful-fs')
 var path = require("path")
 var Url = require("url")
 var cheerio = require("cheerio")
-var request = require('requestretry')
+var requestretry = require('requestretry')
+var request = require('request') //(requestretry);
+const http = require("http")
+http.globalAgent.maxSockets = 1
 var unique = require('array-unique')
 var program = require('commander')
 var process = require('process')
 var sanitize = require("sanitize-filename")
+var util = require('util')
+var tracer = require('tracer')
+var logger = tracer.console({
+    format: ["{{timestamp}} <{{title}}> {{message}}",
+        {
+            error: "{{timestamp}} <{{title}}> {{message}} (in {{file}}:{{line}})\nCall Stack:\n{{stack}}" // error format
+        }
+    ],
+    dateformat: "HH:MM:ss.L"
+});;
+
+var logger = tracer.console({
+    format: ["{{timestamp}} <{{title}}> {{message}} (in {{file}}:{{line}})",
+        {
+            error: "{{timestamp}} <{{title}}> {{message}} (in {{file}}:{{line}})\nCall Stack:\n{{stack}}" // error format
+        }
+    ],
+    dateformat: "HH:MM:ss.L"
+});;
+
 
 var main = {
     chinese: 'http://www.gld.gov.hk/egazette/tc_chi/gazette/toc.php',
     english: 'http://www.gld.gov.hk/egazette/english/gazette/toc.php'
 }
 
-var baseRequest
+var baseRequest, baseReq
 var noOfPages
 
 program
     .version('0.0.1')
     .usage('[options] <no of pages>')
     .option('-o, --output <path>', 'Output directory')
+    .option('-c, --toc <filename>', 'load TOC from filename instead of downloading.')
     .option('-l, --language <language>', 'Language (chinese or english)', /^(chinese|english)$/, 'chinese')
     .option('-y, --year <year, ...>', 'Download only issue published in specific year(s) (e.g. "-y 2012-2013,2015,2016-" )', yearList)
     .option('-E, --volume <volume, ...>', 'Download only specific volume(s) (e.g. "-E 1-2,5,9" )', numberList)
@@ -39,10 +63,11 @@ program
     .option('-a, --user-agent <user agent>', 'User agent in HTTP request header, default is "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1')
     .option('-d, --no-download', 'Don\'t save any pdf files')
     .option('-e, --export <path>', 'Append found pdf links and title in tab separated format')
+    .option('-D, --debug [filename]', 'Save debug information (default: toc.txt)', "toc.txt")
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .arguments('<no of pages>')
-    .action(function(_noOfPages) {
-        baseRequest = request.defaults({
+    .action(function (_noOfPages) {
+        baseRequest = requestretry.defaults({
             maxAttempts: program.retry,
             retryDelay: program.retryDelay,
             pool: {
@@ -53,7 +78,15 @@ program
                 'User-Agent': program.userAgent
             }
         })
-
+        baseReq = request.defaults({
+            pool: {
+                maxSockets: program.maxConnection
+            },
+            timeout: program.timeout,
+            headers: {
+                'User-Agent': program.userAgent
+            }
+        })
         program.output = program.output || process.cwd()
         if (program.export)
             program.export = path.join(program.output, program.export)
@@ -64,10 +97,21 @@ program
 
         noOfPages = parseInt(_noOfPages)
         if (noOfPages)
-            getToc(main[program.language], [], _noOfPages).then(getVolumes).catch(function(err) {
-                console.error(err)
-            }).finally(removeDupe)
+            if (program.toc) {
+                let toc = fs.readFileSync(program.toc).toString().split("\n")
+                Promise.resolve(toc).then(getVolumes).catch(function (err) {
+                    if (program.debug)
+                        fs.appendFileSync("error.txt", util.format("%s\t%s\n", new Date().toISOString(), err.toString()))
+                    logger.error(err)
+                }).finally(removeDupe)
+            }
         else {
+            getToc(main[program.language], [], _noOfPages).then(getVolumes).catch(function (err) {
+                if (program.debug)
+                    fs.appendFileSync("error.txt", util.format("%s\t%s\n", new Date().toISOString(), err.toString()))
+                logger.error(err)
+            }).finally(removeDupe)
+        } else {
             program.outputHelp()
             process.exit(1)
         }
@@ -93,17 +137,17 @@ function removeDupe() {
     if (program.export) {
         fs.stat(program.export, (err, stats) => {
             if (!err) {
-                console.log("Removing duplicate links...")
+                logger.log("Removing duplicate links...")
                 let rows = fs.readFileSync(program.export, {
                     encoding: "utf8"
                 }).split("\n")
                 rows = unique(rows)
                 fs.writeFileSync(program.export, rows.join("\n"))
             }
-            console.log("All done!")
+            logger.log("All done!")
         })
     } else
-        console.log("All done!")
+        logger.log("All done!")
 }
 
 function isRegExp(val) {
@@ -151,16 +195,19 @@ function numberList(val) {
     return unique(tmp2)
 }
 
-function getToc(nextPage, volumes_url, max_volumes) {
-    console.log("Parsing TOC..")
-    return new Promise(function(resolve, reject) {
-        function get(nextPage, volumes_url, max_volumes) {
-            return baseRequest.get(nextPage, function(error, response, body) {
+function getToc(nextPage, volumeUrls, max_volumes) {
+    logger.log("Parsing TOC..")
+    return new Promise(function (resolve, reject) {
+        function get(nextPage, volumeUrls, maxVolumes, pagesParsed) {
+            return baseRequest.get(nextPage, {
+                timeout: program.timeout
+            }, function (error, response, body) {
                 if (!error && response.statusCode == 200) {
+                    pagesParsed++
                     let $ = cheerio.load(body)
                     if (program.verbose > 2)
-                        console.dir("Parsing: " + nextPage)
-                    $("a[href^='volume.php']").each(function() {
+                        logger.log("Parsing: %s", nextPage)
+                    $("a[href^='volume.php']").each(function () {
                         let uri = Url.parse(this.attribs['href'], {
                             parseQueryString: true
                         })
@@ -169,23 +216,25 @@ function getToc(nextPage, volumes_url, max_volumes) {
                             if (!program.year || program.year.indexOf(parseInt(uri.query.year)) != -1)
                                 if (!program.volume || program.volume.indexOf(parseInt(uri.query.volume)) != -1)
                                     if (!program.no || program.no.indexOf(parseInt(uri.query.no)) != -1)
-                                        pushUnique(volumes_url, Url.resolve(nextPage, this.attribs['href']))
+                                        pushUnique(volumeUrls, Url.resolve(nextPage, this.attribs['href']))
                     })
 
                     let next = $("img[name=nextBtn]").parent()
-                    if (next.length && max_volumes > 1) {
-                        return get(Url.resolve(nextPage, next[0].attribs['href']), volumes_url, --max_volumes)
+                    if (next.length && maxVolumes > 1) {
+                        return get(Url.resolve(nextPage, next[0].attribs['href']), volumeUrls, --maxVolumes, pagesParsed)
                     } else {
-                        volumes_url = unique(volumes_url)
-                        console.log("done! %d links found", volumes_url.length)
-                        resolve(volumes_url)
+                        volumeUrls = unique(volumeUrls)
+                        if (program.debug)
+                            fs.writeFileSync("toc.txt", volumeUrls.join("\n"))
+                        logger.log("done! %d pages parsed, %d links found", pagesParsed, volumeUrls.length)
+                        resolve(volumeUrls)
                     }
                 } else {
                     reject(error)
                 }
             })
         }
-        get(nextPage, volumes_url, max_volumes)
+        get(nextPage, volumeUrls, max_volumes, 0)
 
     })
 }
@@ -202,46 +251,50 @@ function resize(arr, size, defval) {
     }
 }
 
-function getVolumes(volume_urls) {
-    return new Promise(function(resolve, reject) {
-        function get(volume_urls, volume_titles, pdf_urls, pdf_titles) {
-            if (!Array.isArray(volume_titles))
-                volume_titles = []
+function getVolumes(volumeUrls) {
+    logger.log("Parsing volumes...")
+    return new Promise(function (resolve, reject) {
+        function get(volumeUrls, volumeTitles, pdf_urls, pdf_titles) {
+            if (!Array.isArray(volumeTitles))
+                volumeTitles = []
 
-            resize(volume_titles, volume_urls.length, [])
+            resize(volumeTitles, volumeUrls.length, [])
 
             let requests = []
             let downloaded_pdf = []
 
-            for (let i in volume_urls) {
-                let url = volume_urls[i]
-                let title = volume_titles[i]
+            for (let i in volumeUrls) {
+                let url = volumeUrls[i]
+                let title = volumeTitles[i]
 
-                requests.push((function(_url, _title) {
-                    return function() {
+                requests.push((function (_url, _title) {
+                    return function () {
 
-                        baseRequest.get(_url, function(error, response, body) {
+                        baseRequest.get(_url, {
+                            timeout: program.timeout
+                        }, function (error, response, body) {
 
                             let new_volumes_url = []
                             let new_titles = []
                             if (!error && response.statusCode == 200) {
-                                if (program.verbose > 3) console.log("Downloading " + _url + " success!")
+                                if (program.verbose > 3) logger.log("Downloading %s success!", _url)
                                 let $ = cheerio.load(body)
                                 let x = parseUrls($, _url, _title)
                                 new_volumes_url = x[0], new_titles = x[1]
 
                                 let requests = []
-                                $("a[href$='.pdf']").each(function() {
-                                    let absolute_url = Url.resolve(_url, this.attribs['href'])
+                                $("a[href$='.pdf']").each(function () {
+                                    let absoluteUrl = Url.resolve(_url, this.attribs['href'])
 
-                                    if (program.verbose > 3) console.dir("getVolumes(): URL found: " + absolute_url)
+                                    if (program.verbose > 3) logger.log("getVolumes(): URL found: %s", absoluteUrl)
                                     let full_title = _title.join(", ") + ", " + $(this).text().trim()
                                     if (program.export)
-                                        fs.appendFileSync(program.export, [absolute_url].concat(_title).concat([$(this).text().trim()]).join("\t") + "\n")
-                                    if (!program.noDownload) {
-                                        if (downloaded_pdf.indexOf(absolute_url) == -1 && !$(this).text().match(/^\d+$/) && !$(this).text() != "--") {
+                                        fs.appendFileSync(program.export, [absoluteUrl].concat(_title).concat([$(this).text().trim()]).join("\t") + "\n")
 
-                                            let url_parts = Url.parse(absolute_url)
+                                    if (!program.noDownload) {
+                                        if (downloaded_pdf.indexOf(absoluteUrl) == -1 && !$(this).text().match(/^\d+$/) && !$(this).text() != "--") {
+
+                                            let url_parts = Url.parse(absoluteUrl)
                                             let path_parts
 
                                             if (path.sep == "\\")
@@ -259,17 +312,17 @@ function getVolumes(volume_urls) {
                                                 if (name_suffix != "--") {
                                                     mkdirp.sync(path_parts['dir'])
 
-                                                    requests.push((function(absolute_url, output_pathname, _title) {
-                                                        return function() {
+                                                    requests.push((function (absolute_url, output_pathname, _title) {
+                                                        return function () {
                                                             return save(absolute_url, output_pathname, _title)
                                                         }
-                                                    })(absolute_url, output_pathname, _title))
+                                                    })(absoluteUrl, output_pathname, _title))
 
-                                                    downloaded_pdf.push(absolute_url)
+                                                    downloaded_pdf.push(absoluteUrl)
                                                 }
                                             } else {
                                                 if (program.verbose > 1)
-                                                    console.log("[Text Unmatched] Skipping " + absolute_url + " to " + output_pathname + " of " + _title.join(", ") + " because of unmatchedd search filter")
+                                                    logger.log("[Text Unmatched] Skipping %s to %s of %s because of unmatchedd search filter", absoluteUrl, output_pathname, _title.join(", "))
 
                                             }
                                         }
@@ -283,11 +336,11 @@ function getVolumes(volume_urls) {
                                     return get(u, t)
                                 }
                             } else {
-                                console.error("Downloading " + url + " with text " + _title.join(", ") + " failed")
+                                logger.error("Downloading %s with text failed.", url, _title.join(", "))
                                 if (!error)
-                                    console.log(response);
+                                    logger.log(response);
                                 else
-                                    console.error(error)
+                                    logger.error(error)
                             }
 
                         })
@@ -296,7 +349,12 @@ function getVolumes(volume_urls) {
             }
             run(requests)
         }
-        get(volume_urls)
+        if (Array.isArray(volumeUrls))
+            Promise.map(volumeUrls, function (url) {}, {
+                concurrency: 1
+            }).
+        else
+        get(volumeUrls)
     })
 }
 
@@ -305,7 +363,7 @@ function run(requests) {
         let request = requests.shift()
         request()
         if (requests.length > 0) {
-            setTimeout(function() {
+            setTimeout(function () {
                 run(requests)
             }, program.wait)
         }
@@ -316,8 +374,8 @@ function parseUrls($, url, title) {
     let new_volumes_url = [],
         new_titles = []
 
-    $("a[href^='?year=']").each(function() {
-        if (program.verbose > 3) console.dir("getVolumes(): URL found: " + Url.resolve(url, this.attribs['href']))
+    $("a[href^='?year=']").each(function () {
+        if (program.verbose > 3) logger.log("getVolumes(): URL found: %s", Url.resolve(url, this.attribs['href']))
         let uri = Url.parse(this.attribs['href'], {
             parseQueryString: true
         })
@@ -360,17 +418,33 @@ function unique2(arr, arr2) {
 }
 
 function _save(url, file, aTime, mTime) {
-    let fileStream = fs.createWriteStream(file).on('finish', function() {
-        if (program.verbose > 2)
-            console.log("[Fix Date] %s to %s", file, mTime)
-        fs.utimesSync(file, aTime, mTime)
+    logger.log("_save %s %s %s %s", url, file, aTime, mTime)
+    let fileStream = fs.createWriteStream(file).on('error', (err) => {
+        console.error(err)
+    }).on('finish', function () {
+        if (program.verbose>1)
+            logger.log("%s saved to %s with size %d", url, file, stat['size'])
+        let stat = fs.statSync(file)
+        if (aTime !== null && mTime !== null)
+        {
+            if (program.verbose > 2)
+                logger.log("[Fix Date] %s : a:%s, m:%s ", file, aTime, mTime)
+            fs.utimesSync(file, aTime, mTime)
+        }
+        else {
+            logger.error("[Error] %s, %s, %s", file, aTime, mTime)
+        }
     })
     return baseRequest.get(url).pipe(fileStream)
 
 }
 
 function save(url, file, _title) {
-    return baseRequest.head(url).then(function(data) {
+    return baseRequest.head(url, {
+        timeout: program.timeout
+    }, ).on('error', (err) => {
+        logger.log(err)
+    }).on('response', function (data) {
         let mTime = null
         if (data.headers['last-modified'])
             mTime = parseInt(Date.parse(data.headers['last-modified']) / 1000)
@@ -382,26 +456,28 @@ function save(url, file, _title) {
         } catch (e) {
 
             if (program.verbose > 0)
-                console.log("[New File] Saving " + url + " to " + file + " of " + _title.join(", "))
-            _save(url, file, new Date(), mTime)
+                logger.log("[New File] Saving %s to %s of %s", url, file, _title.join(", "))
+            _save(url, file, Date.now()/1000, mTime)
             return;
         }
 
 
         if ('size' in stat && stat['size'] != parseInt(data.headers['content-length'])) {
             if (program.verbose > 0)
-                console.log("[Wrong File Size] Saving " + url + " to " + file + " of " + _title.join(", ") + " local %s vs remote %s", stat['size'], data.headers['content-length'])
+                logger.log("[Wrong File Size] Saving %s to %s of %s, local %s vs remote %s", url, file, _title.join(", "), stat['size'], data.headers['content-length'])
             _save(url, file, stat['atime'], mTime)
         } else {
             if (program.verbose > 1)
-                console.log("[File Exists] Skipping " + url + " to " + file + " of " + _title.join(", "))
+                logger.log("[File Exists] Skipping %s to %s of %s", url, file, _title.join(", "))
+            if (program.debug)
+                fs.appendFileSync("skipped.txt", util.format("%s\t%s\t%s\n", new Date().toISOString(), url, url, file))
             if (localFileTime !== null && mTime !== null && localFileTime != mTime) {
                 if (program.verbose > 2)
-                    console.log("[Fix Date] %s from %s to %s", file, localFileTime, mTime)
+                    logger.log("[Fix Date] %s from %s to %s", file, localFileTime, mTime)
                 fs.utimesSync(file, new Date(), mTime)
             }
         }
-    }, function(error) {
-        console.error(error)
+    }, function (error) {
+        logger.error(error)
     })
 }
