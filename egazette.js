@@ -422,9 +422,9 @@ function _save(url, file, aTime, mTime) {
     let fileStream = fs.createWriteStream(file).on('error', (err) => {
         console.error(err)
     }).on('finish', function () {
+        let stat = fs.statSync(file)
         if (program.verbose>1)
             logger.log("%s saved to %s with size %d", url, file, stat['size'])
-        let stat = fs.statSync(file)
         if (aTime !== null && mTime !== null)
         {
             if (program.verbose > 2)
