@@ -457,7 +457,9 @@ function save(url, file, _title) {
 
             if (program.verbose > 0)
                 logger.log("[New File] Saving %s to %s of %s", url, file, _title.join(", "))
-            _save(url, file, Date.now()/1000, mTime)
+            if (program.debug)
+                fs.appendFileSync("download.txt", util.format("%s\t%s\t%s\t%s\t%s\n", new Date().toISOString(), url, file, _title.join(", "), data.headers['content-length']))
+            _save(url, file, Date.now() / 1000, mTime)
             return;
         }
 
@@ -465,15 +467,19 @@ function save(url, file, _title) {
         if ('size' in stat && stat['size'] != parseInt(data.headers['content-length'])) {
             if (program.verbose > 0)
                 logger.log("[Wrong File Size] Saving %s to %s of %s, local %s vs remote %s", url, file, _title.join(", "), stat['size'], data.headers['content-length'])
+            if (program.debug)
+                fs.appendFileSync("download.txt", util.format("%s\t%s\t%s\t%s\t%s\t%s\n", new Date().toISOString(), url, file, _title.join(", "), stat['size'], data.headers['content-length']))
             _save(url, file, stat['atime'], mTime)
         } else {
             if (program.verbose > 1)
                 logger.log("[File Exists] Skipping %s to %s of %s", url, file, _title.join(", "))
             if (program.debug)
-                fs.appendFileSync("skipped.txt", util.format("%s\t%s\t%s\n", new Date().toISOString(), url, url, file))
+                fs.appendFileSync("skipped.txt", util.format("%s\t%s\t%s\n", new Date().toISOString(), url, file))
             if (localFileTime !== null && mTime !== null && localFileTime != mTime) {
-                if (program.verbose > 2)
+                if (program.verbose > 2) {
                     logger.log("[Fix Date] %s from %s to %s", file, localFileTime, mTime)
+                    fs.appendFileSync("fix_date.txt", util.format("%s\t%s\t%s\t%s\t%s\n", new Date().toISOString(), url, file, localFileTime, mTime))
+                }
                 fs.utimesSync(file, new Date(), mTime)
             }
         }
