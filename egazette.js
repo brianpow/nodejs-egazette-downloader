@@ -423,15 +423,13 @@ function _save(url, file, aTime, mTime) {
         console.error(err)
     }).on('finish', function () {
         let stat = fs.statSync(file)
-        if (program.verbose>1)
+        if (program.verbose > 1)
             logger.log("%s saved to %s with size %d", url, file, stat['size'])
-        if (aTime !== null && mTime !== null)
-        {
+        if (aTime !== null && mTime !== null) {
             if (program.verbose > 2)
                 logger.log("[Fix Date] %s : a:%s, m:%s ", file, aTime, mTime)
             fs.utimesSync(file, aTime, mTime)
-        }
-        else {
+        } else {
             logger.error("[Error] %s, %s, %s", file, aTime, mTime)
         }
     })
