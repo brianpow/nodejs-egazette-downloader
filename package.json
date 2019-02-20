@@ -5,15 +5,18 @@
   "main": "egazette.js",
   "dependencies": {
     "array-unique": "^0.3.2",
-    "bluebird": "^3.4.7",
-    "cheerio": "^0.22.0",
-    "graceful-fs": "^4.1.11",
+    "bluebird": "^3.5.3",
+    "cheerio": "^1.0.0-rc.2",
+    "graceful-fs": "^4.1.15",
     "mkdirp": "^0.5.1",
     "request-defaults": "^1.2.0",
-    "requestretry": "^1.12.0",
-    "sanitize-filename": "^1.6.1"
+    "requestretry": "^3.1.0",
+    "sanitize-filename": "^1.6.1",
+    "tracer": "^0.9.8"
   },
-  "devDependencies": {},
+  "devDependencies": {
+    "webpack-cli": "^3.2.3"
+  },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
