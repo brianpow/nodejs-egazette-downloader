@@ -7,9 +7,6 @@ var path = require("path")
 var Url = require("url")
 var cheerio = require("cheerio")
 var requestretry = require('requestretry')
-var request = require('request') //(requestretry);
-const http = require("http")
-http.globalAgent.maxSockets = 1
 var unique = require('array-unique')
 var program = require('commander')
 var process = require('process')
@@ -40,7 +37,7 @@ var main = {
     english: 'http://www.gld.gov.hk/egazette/english/gazette/toc.php'
 }
 
-var baseRequest, baseReq
+var baseRequest
 var noOfPages
 
 program
@@ -78,15 +75,7 @@ program
                 'User-Agent': program.userAgent
             }
         })
-        baseReq = request.defaults({
-            pool: {
-                maxSockets: program.maxConnection
-            },
-            timeout: program.timeout,
-            headers: {
-                'User-Agent': program.userAgent
-            }
-        })
+        
         program.output = program.output || process.cwd()
         if (program.export)
             program.export = path.join(program.output, program.export)
