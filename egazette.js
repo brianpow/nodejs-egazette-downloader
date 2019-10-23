@@ -62,7 +62,8 @@ program
     .option('-d, --no-download', 'Don\'t save any pdf files')
     .option('-e, --export <path>', 'Append found pdf links and title in tab separated format')
     .option('-p, --proxy <proxy>', 'Use proxy')
-    .option('-D, --debug [filename]', 'Save debug information (default: toc.txt)', "toc.txt")
+    .option('-x, --log', 'Save log')
+    .option('-X, --log-path <path>', 'Log path (default: log)', 'log')
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .arguments('<no of pages>')
     .action(function (_noOfPages) {
@@ -104,15 +105,15 @@ program
             if (program.toc) {
                 let toc = fs.readFileSync(program.toc).toString().split("\n")
                 Promise.resolve(toc).then(getVolumes).catch(function (err) {
-                    if (program.debug)
-                        fs.appendFileSync("error.txt", util.format("%s\t%s\n", new Date().toISOString(), err.toString()))
+                    if (program.log)
+                        fs.appendFileSync(path.join(program.logPath, "error.txt"), util.format("%s\t%s\n", new Date().toISOString(), err.toString()))
                     logger.error(err)
                 }).finally(removeDupe)
             }
         else {
             getToc(main[program.language], [], _noOfPages).then(getVolumes).catch(function (err) {
-                if (program.debug)
-                    fs.appendFileSync("error.txt", util.format("%s\t%s\n", new Date().toISOString(), err.toString()))
+                if (program.log)
+                    fs.appendFileSync(path.join(program.logPath, "error.txt"), util.format("%s\t%s\n", new Date().toISOString(), err.toString()))
                 logger.error(err)
             }).finally(removeDupe)
         } else {
@@ -126,6 +127,9 @@ if (!noOfPages || !parseInt(noOfPages)) {
     program.outputHelp()
     process.exit(1)
 }
+
+if (program.log)
+    mkdirp.sync(program.logPath)
 
 function increaseVerbosity(v, total) {
     return total + 1
@@ -228,8 +232,8 @@ function getToc(nextPage, volumeUrls, max_volumes) {
                         return get(Url.resolve(nextPage, next[0].attribs['href']), volumeUrls, --maxVolumes, pagesParsed)
                     } else {
                         volumeUrls = unique(volumeUrls)
-                        if (program.debug)
-                            fs.writeFileSync("toc.txt", volumeUrls.join("\n"))
+                        if (program.log)
+                            fs.writeFileSync(path.join(program.logPath, "toc.txt"), volumeUrls.join("\n"))
                         logger.log("done! %d pages parsed, %d links found", pagesParsed, volumeUrls.length)
                         resolve(volumeUrls)
                     }
@@ -459,8 +463,8 @@ function save(url, file, _title) {
 
             if (program.verbose > 0)
                 logger.log("[New File] Saving %s to %s of %s", url, file, _title.join(", "))
-            if (program.debug)
-                fs.appendFileSync("download.txt", util.format("%s\t%s\t%s\t%s\t%s\n", new Date().toISOString(), url, file, _title.join(", "), data.headers['content-length']))
+            if (program.log)
+                fs.appendFileSync(path.join(program.logPath, "download.txt"), util.format("%s\t%s\t%s\t%s\t%s\n", new Date().toISOString(), url, file, _title.join(", "), data.headers['content-length']))
             _save(url, file, Date.now() / 1000, mTime)
             return;
         }
@@ -469,18 +473,18 @@ function save(url, file, _title) {
         if ('size' in stat && stat['size'] != parseInt(data.headers['content-length'])) {
             if (program.verbose > 0)
                 logger.log("[Wrong File Size] Saving %s to %s of %s, local %s vs remote %s", url, file, _title.join(", "), stat['size'], data.headers['content-length'])
-            if (program.debug)
-                fs.appendFileSync("download.txt", util.format("%s\t%s\t%s\t%s\t%s\t%s\n", new Date().toISOString(), url, file, _title.join(", "), stat['size'], data.headers['content-length']))
+            if (program.log)
+                fs.appendFileSync(path.join(program.logPath, "download.txt"), util.format("%s\t%s\t%s\t%s\t%s\t%s\n", new Date().toISOString(), url, file, _title.join(", "), stat['size'], data.headers['content-length']))
             _save(url, file, stat['atime'], mTime)
         } else {
             if (program.verbose > 1)
                 logger.log("[File Exists] Skipping %s to %s of %s", url, file, _title.join(", "))
-            if (program.debug)
-                fs.appendFileSync("skipped.txt", util.format("%s\t%s\t%s\n", new Date().toISOString(), url, file))
+            if (program.log)
+                fs.appendFileSync(path.join(program.logPath, "skipped.txt"), util.format("%s\t%s\t%s\n", new Date().toISOString(), url, file))
             if (localFileTime !== null && mTime !== null && localFileTime != mTime) {
                 if (program.verbose > 2) {
                     logger.log("[Fix Date] %s from %s to %s", file, localFileTime, mTime)
-                    fs.appendFileSync("fix_date.txt", util.format("%s\t%s\t%s\t%s\t%s\n", new Date().toISOString(), url, file, localFileTime, mTime))
+                    fs.appendFileSync(path.join(program.logPath, "fix_date.txt"), util.format("%s\t%s\t%s\t%s\t%s\n", new Date().toISOString(), url, file, localFileTime, mTime))
                 }
                 fs.utimesSync(file, new Date(), mTime)
             }
