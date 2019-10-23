@@ -12,6 +12,7 @@
     "request-defaults": "^1.2.0",
     "requestretry": "^3.1.0",
     "sanitize-filename": "^1.6.1",
+    "socks-proxy-agent": "^4.0.2",
     "tracer": "^0.9.8"
   },
   "devDependencies": {

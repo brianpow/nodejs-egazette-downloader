@@ -2,6 +2,7 @@
 
 var Promise = require("bluebird")
 var mkdirp = require("mkdirp")
+var SocksProxyAgent = require('socks-proxy-agent')
 var fs = require('graceful-fs')
 var path = require("path")
 var Url = require("url")
@@ -60,11 +61,12 @@ program
     .option('-a, --user-agent <user agent>', 'User agent in HTTP request header, default is "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1"', 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:15.0) Gecko/20100101 Firefox/15.0.1')
     .option('-d, --no-download', 'Don\'t save any pdf files')
     .option('-e, --export <path>', 'Append found pdf links and title in tab separated format')
+    .option('-p, --proxy <proxy>', 'Use proxy')
     .option('-D, --debug [filename]', 'Save debug information (default: toc.txt)', "toc.txt")
     .option('-v, --verbose', 'Be more verbose (max -vvvv)', increaseVerbosity, 0)
     .arguments('<no of pages>')
     .action(function (_noOfPages) {
-        baseRequest = requestretry.defaults({
+        var config = {
             maxAttempts: program.retry,
             retryDelay: program.retryDelay,
             pool: {
@@ -74,8 +76,21 @@ program
             headers: {
                 'User-Agent': program.userAgent
             }
-        })
-        
+        }
+        if (program.proxy) {
+            if (program.proxy == 'tor')
+                program.proxy = 'socks5://127.0.0.1:9050'
+
+            if (program.proxy.substr(0, 5) == "socks") {
+                var agent = new SocksProxyAgent(program.proxy)
+                config['agent'] = agent
+            } else
+                config['proxy'] = program.proxy
+
+        } else
+            console.warn("Warning, you are not using proxy.")
+        baseRequest = requestretry.defaults(config)
+
         program.output = program.output || process.cwd()
         if (program.export)
             program.export = path.join(program.output, program.export)
