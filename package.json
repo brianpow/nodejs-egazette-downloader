@@ -5,9 +5,9 @@
   "main": "egazette.js",
   "dependencies": {
     "array-unique": "^0.3.2",
-    "bluebird": "^3.5.3",
+    "bluebird": "^3.7.1",
     "cheerio": "^1.0.0-rc.3",
-    "commander": "^3.0.2",
+    "commander": "^4.0.0",
     "graceful-fs": "^4.2.3",
     "mkdirp": "^0.5.1",
     "process": "^0.11.10",
@@ -17,7 +17,7 @@
     "tracer": "1.x"
   },
   "devDependencies": {
-    "webpack-cli": "^3.2.3"
+    "webpack-cli": "^3.3.10"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
